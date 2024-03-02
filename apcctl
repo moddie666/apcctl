@@ -1,0 +1,137 @@
+#!/bin/bash
+#
+# - apcctl -
+# control APC7920 via telnet
+# https://github.com/moddie666/apcctl 
+#
+
+ME=$(basename $0)
+USAGE="$ME (ls|<outlet number>|<outlet name regex(awk)>) [on|off]"
+
+APCIP="192.168.0.69"
+USER="apc"
+PASS="apc"
+
+if [ -f /etc/$ME.conf ]
+then source /etc/$ME.conf
+fi
+
+PORT="$1"
+
+
+
+apc_outlet_ls(){
+#(expect |egrep 'ON|OFF' | sed -r 's#\s+# #g;s#-##g;s#^\s+##g' ) << ÄXPÄKT
+expect << ÄXPÄKT
+spawn telnet $APCIP 23
+set timeout 2
+#ESCAPE send "\x1b\r"
+
+expect "User Name :"
+send "$USER\r"
+expect "Password  :"
+send "$PASS\r"
+
+expect ">"
+send "1\r"
+expect ">"
+send "3\r" 
+
+#GO BACK TO MAIN MENU
+expect ">"
+send "\x1b\r"
+expect ">"
+send "\x1b\r"
+expect ">"
+send "\x1b\r"
+
+#LOG OUT
+expect ">"
+send "4\r"
+
+expect eof
+exit 0
+ÄXPÄKT
+
+}
+
+expect_onoff(){
+
+(expect | egrep -i "$1 named.*OFF|$1 named.*ON" | sed -r 's#\s+# #g;s#^\s+##g') << ÄXPÄKT
+spawn telnet $APCIP 23
+set timeout 2
+#ESCAPE send "\x1b\r"
+
+expect "User Name :"
+send "$USER\r"
+expect "Password  :"
+send "$PASS\r"
+
+expect ">"
+send "1\r"
+expect ">"
+send "3\r" 
+expect ">"
+
+send "$1\r"
+expect ">"
+#     1- Control Outlet    
+#     2- Configure Outlet 
+send "1\r"
+expect ">" 
+#     1- Immediate On              
+#     2- Immediate Off             
+send "$2\r"
+expect " :"
+send "yes\r"
+
+#GO BACK TO MAIN MENU
+send "\x1b\r"
+expect ">"
+send "\x1b\r"
+expect ">"
+send "\x1b\r"
+expect ">"
+send "\x1b\r"
+expect ">"
+send "\x1b\r"
+
+#LOG OUT
+expect ">"
+send "4\r"
+
+expect eof
+exit 0
+ÄXPÄKT
+
+}
+
+apc_outlet_onoff(){
+if [ "x$(egrep '^[0-9]+$' <<< "$1")" = "x" ]
+then oport="$1"
+     OUTL=$(apc_outlet_ls | awk '/^[0-9]+ '"$1"' (ON|OFF)/{print $1}')
+     if [ "x$OUTL" = "x" ]
+     then echo "No such Outlet [$oport]"
+          apc_outlet_ls
+          exit 1
+     fi
+     for o in $OUTL
+     do expect_onoff $o $2
+     done
+else
+     expect_onoff $1 $2
+fi
+
+}
+
+case $1 in
+     ls)apc_outlet_ls
+        exit $?;;
+esac
+
+case $2 in
+     on)apc_outlet_onoff "$PORT" 1;;
+    off)apc_outlet_onoff "$PORT" 2;;
+      *)echo "$USAGE"; exit 1;;
+esac
+
