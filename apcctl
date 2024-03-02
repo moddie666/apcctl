@@ -21,8 +21,7 @@ PORT="$1"
 
 
 apc_outlet_ls(){
-#(expect |egrep 'ON|OFF' | sed -r 's#\s+# #g;s#-##g;s#^\s+##g' ) << ÄXPÄKT
-expect << ÄXPÄKT
+(expect |egrep 'ON|OFF' | sed -r 's#\s+# #g;s#-##g;s#^\s+##g' ) << ÄXPÄKT
 spawn telnet $APCIP 23
 set timeout 2
 #ESCAPE send "\x1b\r"
